@@ -1,0 +1,244 @@
+---
+title: "Relatório de Classificação"
+author: "Lania Barros Gomes Martins"
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output:
+    html_document:
+       highlight: textmate
+       theme: flatly
+       number_sections: yes
+       toc: yes
+       toc_float:
+         collapsed: yes
+         smooth_scroll: no
+---
+---
+
+# Contextualização
+
+Será usada o dataset BreastCancer disponível no pacote "mlbench". Na base constam 699 observações em 11 variáveis referentes a identificação de classes benígnas e malígnas. Foi observado 16 valores de atributos ausentes.
+
+# Objetivo
+
+O objetivo é utilizar o conjunto **BreastCancer** para realizar análises de classificação. Para isso, a variável "Class", onde constam as informações benign ou malignant, será utilizada como nossa variável dependente.
+
+
+# Extração e tratamento do dados
+
+## Carregamento dos pacotes
+
+```{r Pacotes, message=FALSE, warning=FALSE}
+
+library(devtools)
+library(factoextra)
+library(FactoMineR)
+library(mlbench)
+library(corrplot)
+library(tree)
+library(caret)
+library(randomForest)
+require(MASS)
+
+```
+
+## Leitura e visualização do banco de dados
+
+```{r Leitura e tipos de variáveis}
+data(BreastCancer)
+
+dados<- BreastCancer[,-c(1)]
+dados2<- BreastCancer[,-c(1)]
+
+str(dados)
+```
+
+```{r visualizando os 6 primeiras linhas da base de dados}
+head(dados)
+```
+
+## Tratamento das variáveis
+
+```{r}
+for (i in 1:10){
+  dados[,i] <- as.numeric(dados[,i])
+}
+```
+
+## Verificação de dados faltantes na base de dados
+
+```{r}
+any(is.na(dados))
+```
+
+### Percentual de dados faltantes
+
+```{r}
+NAS <- round(colSums(is.na(dados))*100/nrow(dados),2)
+NAS[NAS>0]
+```
+
+Somente a coluna Bare.Nuclei apresenta dados NA.
+
+### Exclusão das observações com dados faltantes
+
+Como eram poucos dados NA, optou-se por excluir essas linhas.
+
+```{r}
+df <- na.omit(dados) 
+
+dados2 <- na.omit(dados2) 
+```
+
+A base passou de `r nrow(dados)` para `r nrow(df)` observações.
+
+### Correlação entre variáveis
+<br>
+Verificação da existência de correlação entre as variáveis.
+```{r}
+#resultado=rcorr(as.matrix(df[,-10]))
+
+corrplot(cor(df[,-10]), type="upper", order="hclust", 
+         sig.level = 0.01, insig = "blank")
+```
+
+
+# Árvore de Classificação
+
+## Selecionar dados de treino
+
+Seleção de parte dos dados para realização do treinamento.
+
+```{r}
+
+benigno <- dados2[dados2$Class=="benign",] 
+maligno <- dados2[dados2$Class=="malignant",] 
+
+dados_train <- rbind(benigno[1:222,],maligno[1:119,])
+dados_test <- rbind(benigno[223:444,],maligno[119:239,])
+
+```
+
+## Ajuste da árvore de classificação
+
+```{r}
+
+arvore1 <- tree(Class ~ ., data = dados_train)
+
+```
+
+```{r}
+summary(arvore1)
+
+```
+
+```{r}
+plot(arvore1)
+text(arvore1)
+```
+
+Para construção da árvore foi utilizada somente 6(seis) das 9(nove) variáveis do dataset.
+<br>
+A árvore ficou com 10(dez) nós terminais.
+
+## Poda da árvore
+
+Testes para verificar se é interessante a realização da poda.
+
+```{r}
+cv.BreastCancer=cv.tree(arvore1)
+plot(cv.BreastCancer$size ,cv.BreastCancer$dev,type="b")
+```
+
+Vamos estar realizando uma poda para 8(oito) nós terminais.
+```{r}
+mod_poda=prune.tree(arvore1,best=8)
+plot(mod_poda)
+text(mod_poda, pretty =0)
+```
+
+## Teste de Predição
+
+```{r}
+pred_arv <- predict(mod_poda, dados_test, type="class")
+head(pred_arv)
+
+confusionMatrix(pred_arv, dados_test$Class) 
+```
+
+Do total de 343 amostras, o modelo acertou 214 (benign) e 113 (malignant) com acurácia de 95%.
+
+# Random Forest
+Realização de ajuste do modelo de árvore de classificação utilizando o random forest.
+
+```{r}
+rf<- randomForest(Class ~., data = dados_train,  mtry = 3)
+rf
+
+```
+
+## Avaliação do modelo (Predição)
+```{r}
+pred_rf <- predict(rf, dados_test)
+confusionMatrix(pred_rf, dados_test$Class)
+```
+
+Do total de 343 amostras o modelo acertou 220 (benign) e 115 (malignant) com acurácia de 97%
+
+
+
+## Verificação da importância de cada variável no ajuste
+
+```{r}
+i_mod_rf <-importance(rf)
+i_mod_rf
+
+varImpPlot (rf)
+```
+
+
+# Validação cruzada
+
+```{r}
+r <- lda(formula = Class ~ ., 
+         data = dados_train, 
+         prior = c(1,1)/2, CV=TRUE)
+```
+
+## Classifição e tabela de confusão
+
+```{r}
+classificao <- r$class
+
+
+cvl <- table(dados_train$Class,classificao)
+cvl
+```
+
+## Taxa de Erro Aparente
+
+```{r}
+TEA <- 1 - (sum(diag(cvl))/sum(cvl))
+TEA
+```
+
+Do total de 341 amostras o modelo acertou 214 (benign) e 105 (malignant) obtendo taxa de erro de 0.06.
+
+
+
+# Conclusão
+
+Com base nos testes realizados podemos o observar que o modelo de árvore ajustado com o random forest obteve o melhor resultado, conforme observado abaixo:
+
+
+|                      | Total amostras | Acertos Benignos | Acertos Malignos |
+|----------------------|----------------|------------------|------------------|
+| Árvore classificação | 343            | 214              | 113              |
+| Random Forest        | 343            | 220              | 115              |
+| Validação Cruzada    | 341            | 214              | 105              |
+
+
+
+
+# Referências
+
+-   [Infomações sobre o dataset utilizado] <https://cran.r-project.org/web/packages/mlbench/mlbench.pdf>

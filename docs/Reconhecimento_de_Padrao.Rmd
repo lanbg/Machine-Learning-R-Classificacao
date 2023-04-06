@@ -1,0 +1,216 @@
+---
+title: "Reconhecimento de Padrão"
+author: "Lania Barros Gomes Martins"
+date: "31/01/2023"
+output:
+    html_document:
+       highlight: textmate
+       theme: flatly
+       number_sections: yes
+       toc: yes
+       toc_float:
+         collapsed: yes
+         smooth_scroll: no
+---
+
+# Contextualização
+
+Será usada o dataset BreastCancer disponível no pacote "mlbench". Na base constam 699 observações em 11 variáveis referentes a identificação de classes benígnas e malígnas. Foi observado 16 valores de atributos ausentes.
+
+# Objetivo
+
+O objetivo é utilizar o conjunto **BreastCancer** para realizar análises de reconhecimento de padrões. Por isso, a variável "Class", onde constam as informações benign ou malignant, será desconsiderada.
+
+# Análise de Componentes Principais
+
+## Carregamento dos pacotes
+
+```{r Pacotes, message=FALSE, warning=FALSE}
+
+library(devtools)
+library(factoextra)
+library(FactoMineR)
+library(mlbench)
+library(corrplot)
+
+
+```
+
+## Leitura e visualização do banco de dados
+
+```{r Leitura e tipos de variáveis}
+data(BreastCancer)
+
+dados<- BreastCancer[,-c(1)]
+
+str(dados)
+```
+
+```{r visualizando os 6 primeiras linhas da base de dados}
+head(dados[,-10])
+```
+
+## Tratamento das variáveis
+
+```{r}
+for (i in 1:10){
+  dados[,i] <- as.numeric(dados[,i])
+}
+```
+
+As variáveis factor foram convertidas para numéricas para criação do PCA.
+
+## Verificação de dados faltantes na base de dados
+
+```{r}
+any(is.na(dados))
+```
+
+### Percentual de dados faltantes
+
+```{r}
+NAS <- round(colSums(is.na(dados))*100/nrow(dados),2)
+NAS[NAS>0]
+```
+
+Somente a coluna Bare.Nuclei apresenta dados NA.
+
+### Exclusão das observações com dados faltantes
+
+Como eram poucos dados NA, optou-se por excluir essas linhas.
+
+```{r}
+df <- na.omit(dados) 
+```
+
+A base passou de `r nrow(dados)` para `r nrow(df)` observações.
+
+### Correlação entre variáveis
+<br>
+Verificação da existência de correlação entre as variáveis.
+```{r}
+#resultado=rcorr(as.matrix(df[,-10]))
+
+corrplot(cor(df[,-10]), type="upper", order="hclust", 
+         sig.level = 0.01, insig = "blank")
+```
+
+## Cálculo Matriz de Covariança
+
+Para calcular os componetes principais foram usadas 9 variáveis núméricas.
+
+```{r}
+pca_Cov <- princomp(df[,-10],cor = FALSE, scores = TRUE)
+
+summary(pca_Cov)
+```
+
+### Pesos (autovetores da matrix de covariância)
+
+```{r}
+pca_Cov$loadings
+```
+
+### Mostrando os scores das seis primeiras linhas
+
+```{r}
+head(pca_Cov$scores)
+```
+<br>
+Analisando o gráfico abaixo, podemos observar a possibilidade de, no mínimo, dois grupos.
+Além disso, Os dados a esquerda, das setas, apresentam valores mais baixos em relação as variáveis.
+
+```{r}
+biplot(pca_Cov, cex = 0.30)
+
+```
+
+### Percentual de explicação dos componentes principais (PCA)
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+p2 <- fviz_eig(pca_Cov,
+               addlabels = TRUE,
+               geom = "bar",
+               barfill = "orange",
+               barcolor = "black",
+               xlab = "Componentes Principais",
+               ylab = "Porcentagem da variância explicada",
+               main = "")
+plot(p2)
+```
+
+Com a utilização de 2(duas) variáveis latentes obtemos **75,2%** de explicação da variância dos dados.
+
+# Análise de Agrupamento
+
+Para nossa análise será utilizada como medida a **distância euclidiana Quadrática**.
+
+## Cálculo da distância Euclidiana
+
+```{r}
+D <- dist(df[,-11], method = "euclidian")^2
+```
+
+## Agrupamento Hierárquico (vizinho mais distânte)
+
+```{r}
+agr <- hclust(D,method="complete")
+```
+
+## Criação do Dendrograma
+
+```{r}
+plot(agr, xlab=" ", ylab="Distância Euclidiana Quadrática", cex=0.20)
+
+```
+
+### Qualidade dos agrupamentos (correlação cofenética)
+
+```{r}
+cof <- cophenetic(agr)
+cor(cof,D)
+```
+
+Podemos verificar que o agrupamento é satisfatório.
+
+### Otimização (K-médias)
+
+Será adotado como método de otimização o K-médias.
+
+Foi definido a divisão dos dados em 2 grupos.
+
+```{r echo=FALSE, warning=FALSE, message=FALSE}
+grupos <- 2
+
+de1 <- fviz_dend(agr,
+                 k = grupos,
+                 cex = 0.20,
+                 xlab = "",
+                 ylab =  "Distância Euclidiana Quadrática",
+                 main = "")
+
+de1
+```
+
+Análise da distribuição das observações pelos `r grupos` grupos.
+
+```{r}
+km <- kmeans(x=df[,-11],2,nstart=20)
+```
+
+```{r}
+
+fviz_cluster(km, df[, -10], geom = "text")
+```
+
+# Conclusão
+
+Com a utização do PCA podemos fazer a diminuição da dimensionalidade do dataset, nos permitindo uma visualização gráfica do conjunto de dados. Com a utilização dos dois primeiros componetes obtemos 75% de explicação das observações. A vista disso, podemos deduzir a possível existência de dois grupos nas observações.
+
+Através de técnicas de agrupamento, podemos analisar a distribuição das observações nos dois grupos.
+
+# Referências
+
+-   [Infomações sobre o dataset utilizado] <https://cran.r-project.org/web/packages/mlbench/mlbench.pdf>
+
+-   [E-Book - Software R para avaliação de dados experimentais:] <https://tiagoolivoto.github.io/e-bookr/multivariate.html>

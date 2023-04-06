@@ -1,0 +1,148 @@
+---
+title: "Relatório Predição"
+author: "Lania Barros Gomes Martins"
+date: "31/01/2023" #"`r format(Sys.time(), '%d %B, %Y')`"
+output:
+    html_document:
+       highlight: textmate
+       theme: flatly
+       number_sections: yes
+       toc: yes
+       toc_float:
+         collapsed: yes
+         smooth_scroll: no
+---
+
+# Contextualização
+
+Será usada o dataset BostonHousing disponível no pacote "mlbench". Na base constam 506 observações em 14 variáveis, referentes a taxa de ocupação média de casas na região de Boston nos EUA.
+
+# Objetivo/Método 
+
+O objetivo é utilizar o dataset **BostonHousing** para realizar análises de predição. Para isso, a variável "mdev" será nossa variável dependente, sendo as demais utilizadas para prever o seu valor.
+
+Para isso, estaremos realizando a técnica de **regressão linear múltipla**.
+
+# Preparação dos dados
+
+## Carregamento dos pacotes
+
+```{r Pacotes, message=FALSE, warning=FALSE}
+library(MASS) 
+library(corrplot)
+library(tidyverse)
+library(caret)
+```
+
+## Leitura e visualização do banco de dados
+
+```{r Leitura e tipos de variáveis}
+data(Boston)
+
+dados <- Boston
+
+str(dados)
+```
+
+```{r visualizando os 6 primeiras linhas da base de dados}
+head(dados)
+```
+
+## Pré-processamento (Tratamento das variáveis)
+
+```{r}
+
+any(is.na(dados))
+
+for (i in 1:length(dados)){
+  dados[,i] <- as.numeric(dados[,i])
+}
+```
+
+As variáveis foram convertidas para numérico e não foi identificado nenhum dado faltante.
+
+## Resumo dos dados
+
+```{r}
+summary(dados)
+```
+
+# Correlação entre variáveis
+```{r}
+
+corrplot(cor(dados))
+
+```
+
+
+# Regressão Linear multipla
+
+## Selecionar dados de treino
+
+Seleção de parte dos dados para realização do treinamento do modelo de regressão.
+
+```{r}
+
+set.seed(1)
+linhas <- sample (1:nrow(dados), nrow(dados)*0.7) #70%
+treino <- dados[linhas,]#70%
+teste <- dados[-linhas,]#30%
+
+```
+
+## Regressão linear múltipla
+
+Executando a análise de regressão linar com todas as variáveis do dataset.
+
+Podemos perceber que as variáveis **"indus"** e **"age"** não apresentaram significância no modelo.
+
+O modelo apresentou um coeficiente de determinação ajustado de 0.7693.
+
+```{r}
+
+mod1 <- lm(medv~., data = treino)
+summary(mod1)
+
+```
+
+## Ajustes no modelo
+
+```{r}
+reducao <- step(mod1, direction= "backward", trace= 1)
+```
+
+Com a redução as variáveis **"indus"** e **"age"** forma retiradas do modelo.
+
+## Modelo otimizado
+
+
+```{r}
+mod2 <- lm(medv ~ crim + zn + chas + nox + rm + dis + rad + tax + ptratio + 
+             black + lstat, data=treino) #Adjusted R-squared: 0.7699
+
+summary(mod2)
+
+mod3 <- lm(medv ~ crim + zn + chas + nox + rm + dis + rad + tax + ptratio + 
+             black + lstat, data=teste) #Adjusted R-squared: 0.6492 
+
+summary(mod3)
+```
+
+## Teste de predição
+
+Para o teste de predição serão usados valores de uma observação, presente nos dados de teste, com valor real de **36.2** na variável mdev.
+```{r}
+novo <- data.frame(crim = 0.06905, zn = 0.0, chas = 0 ,nox= 0.458, rm = 7.147,dis = 6.0622, rad = 3,tax = 222 , ptratio = 18.7, black = 396.90  ,lstat = 5.33)
+predict(mod2,novo)
+```
+
+# Conclusão
+
+Comparado o valor predito de 29,04513 e o valor real de 36.2, podemos verificar que a predição ficou próxima do desejado. 
+Para melhorar a acurácia, podemos reavaliar as variáveis e verificar a possibilidade de retirar mais algumas.
+
+
+# Referências
+
+-   [Infomações sobre o dataset utilizado]
+<https://www.rdocumentation.org/packages/MASS/versions/7.3-58.1/topics/Boston>
