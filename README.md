@@ -4,4 +4,4 @@
  
  Link  para visualizar o Análise realizada
  
- https://lanbg.github.io/Machine-Learning-with-R/
+ https://lanbg.github.io/Machine-Learning-R-Classificacao/
